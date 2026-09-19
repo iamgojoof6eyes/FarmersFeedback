@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.services.feedback_service import (
+from app.helpers.feedback_service import (
     get_analytics_overview,
     get_domain_analytics,
     get_state_analytics,

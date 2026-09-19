@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.services.digest_service import generate_weekly_agri_digest
+from app.helpers.digest_service import generate_weekly_agri_digest
 
 router = APIRouter(prefix="/digest", tags=["Weekly Agri Digest"])
 

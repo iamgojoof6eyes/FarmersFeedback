@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 from typing import Dict, Any, List
 from app.database import get_db
-from app.services.feedback_service import (
+from app.helpers.feedback_service import (
     get_analytics_overview,
     get_domain_analytics,
     get_state_analytics,

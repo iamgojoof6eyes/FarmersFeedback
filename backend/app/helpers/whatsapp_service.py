@@ -4,9 +4,9 @@ from typing import Dict, Any, List, Optional
 import re
 from app.config import settings
 from app.database import get_db
-from app.services.flagging_pipeline import evaluate_and_flag_gdb
-from app.services.voice_nlp_service import analyze_voice_feedback
-from app.services.agro_chrono_service import format_evening_nudge_message
+from app.helpers.flagging_pipeline import evaluate_and_flag_gdb
+from app.helpers.voice_nlp_service import analyze_voice_feedback
+from app.helpers.agro_chrono_service import format_evening_nudge_message
 
 YES_TOKENS = {"1", "yes", "ha", "haan", "sahi", "helpful", "theek", "shukriya", "हाँ", "हा", "हाँजी", "सही", "उपयोगी", "काम", "ਹਾਂ", "ਹਾਂਜੀ", "ਠੀਕ"}
 NO_TOKENS = {"2", "no", "nahi", "galat", "unhelpful", "kharab", "bekar", "नहीं", "ना", "गलत", "अनुपयोगी", "ਨਹੀਂ", "ਗਲਤ"}
