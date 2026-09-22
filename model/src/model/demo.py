@@ -9,13 +9,19 @@ from pathlib import Path
 if hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8')
 
-# Ensure root is in path
-_ROOT = Path(__file__).resolve().parent.parent.parent
-if str(_ROOT) not in sys.path:
-    sys.path.insert(0, str(_ROOT))
+# Ensure root and src are in path
+_SRC = Path(__file__).resolve().parent.parent
+_ROOT = _SRC.parent.parent
+for p in [str(_SRC), str(_ROOT)]:
+    if p not in sys.path:
+        sys.path.insert(0, p)
 
-from model.simplifier.engine import AgriSimplifier
-from model.simplifier.evaluator import evaluate_benchmark
+try:
+    from model.engine import AgriSimplifier
+    from model.evaluator import evaluate_benchmark
+except ImportError:
+    from .engine import AgriSimplifier
+    from .evaluator import evaluate_benchmark
 
 def main():
     print("=" * 70)
