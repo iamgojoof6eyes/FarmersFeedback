@@ -3,7 +3,7 @@ from pydantic import BaseModel
 from typing import Optional
 from app.database import get_db
 from app.config import settings
-from app.helpers.flagging_pipeline import resolve_flagged_entry
+from helpers.flagging_pipeline import resolve_flagged_entry
 
 router = APIRouter(prefix="/flagged", tags=["Flagged Reviews"])
 

@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Query
-from app.helpers.weather_service import get_imd_agro_alerts, get_crop_smart_advisory
+from helpers.weather_service import get_imd_agro_alerts, get_crop_smart_advisory
 
 router = APIRouter(prefix="/weather", tags=["IMD Weather"])
 

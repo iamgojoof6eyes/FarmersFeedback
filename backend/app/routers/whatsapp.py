@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Request
-from app.helpers.whatsapp_service import process_farmer_interaction, get_farmer_session, update_session
-from app.helpers.session import WhatsAppSimulateRequest
+from helpers.whatsapp_service import process_farmer_interaction, get_farmer_session, update_session
+from helpers.session import WhatsAppSimulateRequest
 
 router = APIRouter(prefix="/whatsapp", tags=["WhatsApp"])
 
