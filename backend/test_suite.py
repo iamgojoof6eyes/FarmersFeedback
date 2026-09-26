@@ -3,8 +3,11 @@ import time
 import subprocess
 import sys
 
+from pathlib import Path
+
+BACKEND_DIR = Path(__file__).resolve().parent
 print("Starting backend server for verification...")
-proc = subprocess.Popen([sys.executable, "-m", "uvicorn", "app.main:app", "--port", "8000"], cwd=r"C:\Users\meaks\.gemini\antigravity\scratch\ajrasakha-feedback-system\backend")
+proc = subprocess.Popen([sys.executable, "-m", "uvicorn", "app.main:app", "--port", "8000"], cwd=str(BACKEND_DIR))
 
 time.sleep(3)
 
