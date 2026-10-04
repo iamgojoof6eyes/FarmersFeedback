@@ -1,122 +1,91 @@
-import { useState } from 'react'
-import heroImg from './assets/hero.png'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import './App.css'
+import { useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { Provider } from 'react-redux';
+import { store, useAppDispatch, useAppSelector } from './store';
+import { fetchDashboardData, checkBackendHealth } from './store/slices/feedbackSlice';
+import { removeToast } from './store/slices/toastSlice';
+import { Header } from './components/Header';
+import { AnalyticsPage } from './pages/AnalyticsPage';
+import { FlaggedPage } from './pages/FlaggedPage';
+import { WhatsAppPage } from './pages/WhatsAppPage';
+import { GdbPage } from './pages/GdbPage';
+import { DigestPage } from './pages/DigestPage';
+import { WeatherPage } from './pages/WeatherPage';
+import { NotFoundPage } from './pages/NotFoundPage';
+import { CheckCircle, AlertCircle, X } from 'lucide-react';
 
-function App() {
-  const [count, setCount] = useState(0)
+function ToastContainer() {
+  const dispatch = useAppDispatch();
+  const toasts = useAppSelector((state) => state.toast.toasts);
+
+  if (toasts.length === 0) return null;
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
+    <div className="fixed bottom-5 right-5 z-50 flex flex-col gap-2.5 max-w-md w-full pointer-events-none px-4">
+      {toasts.map((toast) => (
+        <div 
+          key={toast.id} 
+          className={`pointer-events-auto flex items-center gap-3 p-3.5 rounded-xl text-sm bg-slate-900/95 backdrop-blur-md border border-white/10 shadow-2xl text-slate-100 toast-slide-in ${
+            toast.type === 'success' ? 'border-l-4 border-l-emerald-500' : 'border-l-4 border-l-rose-500'
+          }`}
         >
-          Count is {count}
-        </button>
-      </section>
-
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
+          {toast.type === 'success' ? (
+            <CheckCircle size={18} className="text-emerald-400 shrink-0" />
+          ) : (
+            <AlertCircle size={18} className="text-rose-400 shrink-0" />
+          )}
+          <span className="flex-1 font-medium">{toast.message}</span>
+          <button
+            onClick={() => dispatch(removeToast(toast.id))}
+            className="text-slate-400 hover:text-white p-1 rounded transition-colors cursor-pointer"
+          >
+            <X size={14} />
+          </button>
         </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+      ))}
+    </div>
+  );
 }
 
-export default App
+function MainLayout() {
+  const dispatch = useAppDispatch();
+
+  useEffect(() => {
+    dispatch(fetchDashboardData());
+    const interval = setInterval(() => {
+      dispatch(checkBackendHealth());
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [dispatch]);
+
+  return (
+    <div className="min-h-screen flex flex-col bg-slate-950 text-slate-100">
+      <Header />
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 pb-12">
+        <Routes>
+          <Route path="/" element={<AnalyticsPage />} />
+          <Route path="/analytics" element={<Navigate to="/" replace />} />
+          <Route path="/flagged" element={<FlaggedPage />} />
+          <Route path="/whatsapp" element={<WhatsAppPage />} />
+          <Route path="/gdb" element={<GdbPage />} />
+          <Route path="/digest" element={<DigestPage />} />
+          <Route path="/weather" element={<WeatherPage />} />
+          <Route path="*" element={<NotFoundPage />} />
+        </Routes>
+      </main>
+      <ToastContainer />
+    </div>
+  );
+}
+
+export function App() {
+  return (
+    <Provider store={store}>
+      <BrowserRouter>
+        <MainLayout />
+      </BrowserRouter>
+    </Provider>
+  );
+}
+
+export default App;
