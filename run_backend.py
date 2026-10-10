@@ -10,5 +10,7 @@ for p in [str(backend_dir), str(root_dir)]:
         sys.path.insert(0, p)
 
 if __name__ == "__main__":
-    print("Starting AjraSakha Backend on http://127.0.0.1:8000 ...")
-    uvicorn.run("app.main:app", host="127.0.0.1", port=8000, reload=True, app_dir=str(backend_dir))
+    from backend.app.config import settings
+    print(f"Starting AjraSakha Backend on http://{settings.BACKEND_HOST}:{settings.BACKEND_PORT} ...")
+    uvicorn.run("app.main:app", host=settings.BACKEND_HOST, port=settings.BACKEND_PORT, reload=True, app_dir=str(backend_dir))
+

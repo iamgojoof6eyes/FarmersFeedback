@@ -23,11 +23,10 @@ function ToastContainer() {
   return (
     <div className="fixed bottom-5 right-5 z-50 flex flex-col gap-2.5 max-w-md w-full pointer-events-none px-4">
       {toasts.map((toast) => (
-        <div 
-          key={toast.id} 
-          className={`pointer-events-auto flex items-center gap-3 p-3.5 rounded-xl text-sm bg-slate-900/95 backdrop-blur-md border border-white/10 shadow-2xl text-slate-100 toast-slide-in ${
-            toast.type === 'success' ? 'border-l-4 border-l-emerald-500' : 'border-l-4 border-l-rose-500'
-          }`}
+        <div
+          key={toast.id}
+          className={`pointer-events-auto flex items-center gap-3 p-3.5 rounded-xl text-sm bg-slate-900/95 backdrop-blur-md border border-white/10 shadow-2xl text-slate-100 toast-slide-in ${toast.type === 'success' ? 'border-l-4 border-l-emerald-500' : 'border-l-4 border-l-rose-500'
+            }`}
         >
           {toast.type === 'success' ? (
             <CheckCircle size={18} className="text-emerald-400 shrink-0" />

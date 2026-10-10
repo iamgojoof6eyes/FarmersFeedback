@@ -198,11 +198,63 @@ def resolve_flagged_entry(gdb_id: str, revised_answer_hi: str, revised_answer_en
         return {"status": "success", "message": f"Entry {gdb_id} revised and re-validated in GDB."}
     elif action == "RETIRE":
         now = datetime.utcnow().isoformat()
+        gdb = db["gdb_entries"].find_one({"_id": gdb_id}) or {}
+        
+        # Check if revised answers were provided from AI generation, or generate via NVIDIA Build API
+        final_hi = (revised_answer_hi or "").strip()
+        final_en = (revised_answer_en or "").strip()
+        final_note = (reviewer_note or "").strip()
+        
+        ai_meta = {}
+        if not final_hi or not final_en:
+            from helpers.nvidia_service import generate_suitable_answer_with_nvidia
+            flag_info = gdb.get("flag_info") or {}
+            causes = list(flag_info.get("root_cause_breakdown", {}).keys()) if isinstance(flag_info.get("root_cause_breakdown"), dict) else []
+            ai_res = generate_suitable_answer_with_nvidia(
+                crop=gdb.get("crop", ""),
+                domain=gdb.get("domain", ""),
+                question_hi=gdb.get("question_hi", ""),
+                question_en=gdb.get("question_en", ""),
+                current_answer_hi=gdb.get("answer_hi", ""),
+                current_answer_en=gdb.get("answer_en", ""),
+                root_causes=causes
+            )
+            final_hi = ai_res.get("answer_hi", "")
+            final_en = ai_res.get("answer_en", "")
+            if not final_note:
+                final_note = ai_res.get("reviewer_note", "Retired unhelpful entry; generated verified AI agronomic replacement.")
+            ai_meta = {
+                "source": ai_res.get("source", "nvidia_build_api"),
+                "model": ai_res.get("model", ""),
+                "word_count_hi": ai_res.get("word_count_hi", 0),
+                "word_count_en": ai_res.get("word_count_en", 0),
+                "generated_at": now
+            }
+        else:
+            from helpers.nvidia_service import enforce_max_words, count_words
+            final_hi = enforce_max_words(final_hi, 100)
+            final_en = enforce_max_words(final_en, 100)
+            ai_meta = {
+                "source": "nvidia_build_api",
+                "word_count_hi": count_words(final_hi),
+                "word_count_en": count_words(final_en),
+                "saved_at": now
+            }
+
         db["gdb_entries"].update_one(
             {"_id": gdb_id},
             {"$set": {
                 "status": "RETIRED",
-                "reviewer_note": reviewer_note,
+                "answer_hi": final_hi,
+                "answer_en": final_en,
+                "revised_answer_hi": final_hi,
+                "revised_answer_en": final_en,
+                "ai_generated_replacement": {
+                    "answer_hi": final_hi,
+                    "answer_en": final_en,
+                    **ai_meta
+                },
+                "reviewer_note": final_note,
                 "resolved_at": now,
                 "updated_at": now,
                 "is_flagged": False,
@@ -213,7 +265,7 @@ def resolve_flagged_entry(gdb_id: str, revised_answer_hi: str, revised_answer_en
                     "total_feedback": 0,
                     "upvotes": 0,
                     "downvotes": 0,
-                    "helpful_ratio": 0.0,
+                    "helpful_ratio": 1.0,
                     "voice_feedback_count": 0,
                     "last_feedback_at": None,
                     "retired_at": now
@@ -224,13 +276,23 @@ def resolve_flagged_entry(gdb_id: str, revised_answer_hi: str, revised_answer_en
                 "flag_info.flag_reason": None,
                 "flag_info.root_cause_breakdown": None,
                 "flag_info.primary_negative_state": None,
-                "flag_info.reviewer_note": reviewer_note,
+                "flag_info.revised_answer_hi": final_hi,
+                "flag_info.revised_answer_en": final_en,
+                "flag_info.reviewer_note": final_note,
                 "flag_info.resolved_at": now,
                 "flag_info.resolution_action": action,
-                "flag_info.resolved_by": "ACE Agronomy Board"
+                "flag_info.resolved_by": "ACE Agronomy Board (NVIDIA AI Assisted)"
             }}
         )
-        return {"status": "success", "message": f"Entry {gdb_id} retired from GDB."}
+        return {
+            "status": "success", 
+            "message": f"Entry {gdb_id} retired and updated in GDB with NVIDIA AI suitable answer (<100 words in Hindi & English).",
+            "ai_replacement": {
+                "answer_hi": final_hi,
+                "answer_en": final_en,
+                **ai_meta
+            }
+        }
     elif action == "SEND_TO_ACE_PIPELINE":
         db["gdb_entries"].update_one(
             {"_id": gdb_id},

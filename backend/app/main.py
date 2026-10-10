@@ -56,12 +56,21 @@ app.include_router(flagged.router, prefix=settings.API_V1_PREFIX)
 app.include_router(digest.router, prefix=settings.API_V1_PREFIX)
 app.include_router(weather.router, prefix=settings.API_V1_PREFIX)
 
+@app.get("/api/health")
+@app.get("/health")
+def health_check():
+    return {
+        "status": "online",
+        "project": settings.PROJECT_NAME,
+        "version": settings.VERSION,
+    }
+
 @app.get("/")
 def root():
     return {
         "project": settings.PROJECT_NAME,
         "version": settings.VERSION,
-        "status": "ONLINE",
+        "status": "online",
         "docs_url": "/docs",
         "supported_features": [
             "WhatsApp Two-Turn Feedback State Machine",

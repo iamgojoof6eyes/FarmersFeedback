@@ -1,7 +1,7 @@
-import { WhatsAppSimulator } from '../components/WhatsAppSimulator';
+import { TwilioWhatsAppView } from '../components/TwilioWhatsAppView';
 
 export function WhatsAppPage() {
-  return <WhatsAppSimulator />;
+  return <TwilioWhatsAppView />;
 }
 
 export default WhatsAppPage;

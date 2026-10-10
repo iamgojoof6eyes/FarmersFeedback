@@ -15,7 +15,7 @@ import type {
 
 
 
-const BASE_URL = '/api';
+const BASE_URL = (import.meta.env.VITE_API_BASE_URL as string) || '/api';
 
 export const api = {
   // Analytics
@@ -68,6 +68,25 @@ export const api = {
       body: JSON.stringify(payload)
     });
     if (!res.ok) throw new Error(`Failed to resolve entry: ${res.statusText}`);
+    return res.json();
+  },
+
+  async generateAiAnswer(gdbId: string): Promise<{
+    status: string;
+    gdb_id: string;
+    answer_hi: string;
+    answer_en: string;
+    reviewer_note: string;
+    word_count_hi: number;
+    word_count_en: number;
+    model: string;
+    source: string;
+  }> {
+    const res = await fetch(`${BASE_URL}/flagged/${gdbId}/ai-answer`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    if (!res.ok) throw new Error(`Failed to generate AI answer: ${res.statusText}`);
     return res.json();
   },
 
@@ -162,6 +181,216 @@ export const api = {
     return res.json();
   },
 
+  // Twilio WhatsApp Live Gateway
+  async getTwilioStatus(): Promise<{
+    configured: boolean;
+    account_sid_masked: string;
+    whatsapp_number: string;
+    total_outgoing: number;
+    total_incoming: number;
+    nudges_sent: number;
+    gdb_sent: number;
+  }> {
+    const res = await fetch(`${BASE_URL}/whatsapp/twilio/status`);
+    if (!res.ok) throw new Error(`Failed to get Twilio status: ${res.statusText}`);
+    return res.json();
+  },
+
+  async getTwilioLogs(limit: number = 50): Promise<Array<{
+    _id: string;
+    direction: 'INCOMING' | 'OUTGOING';
+    from?: string;
+    to?: string;
+    body: string;
+    message_type?: string;
+    status?: string;
+    sid?: string;
+    provider?: string;
+    created_at: string;
+  }>> {
+    const res = await fetch(`${BASE_URL}/whatsapp/twilio/logs?limit=${limit}`);
+    if (!res.ok) throw new Error(`Failed to get Twilio logs: ${res.statusText}`);
+    return res.json();
+  },
+
+  async sendTwilioNudge(payload: {
+    phone_number: string;
+    crop?: string;
+    custom_message?: string;
+  }): Promise<{
+    success: boolean;
+    status: string;
+    sid?: string;
+    to: string;
+    mode: string;
+    nudge_body?: string;
+    message?: string;
+    error?: string;
+  }> {
+    const res = await fetch(`${BASE_URL}/whatsapp/twilio/send-nudge`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error(`Failed to send WhatsApp nudge: ${res.statusText}`);
+    return res.json();
+  },
+
+  async sendTwilioGdb(payload: {
+    phone_number: string;
+    gdb_id?: string;
+    query?: string;
+  }): Promise<{
+    success: boolean;
+    status: string;
+    sid?: string;
+    to: string;
+    mode: string;
+    gdb_id?: string;
+    crop?: string;
+    question?: string;
+    answer?: string;
+    dispatched_text?: string;
+    message?: string;
+    error?: string;
+  }> {
+    const res = await fetch(`${BASE_URL}/whatsapp/twilio/send-gdb`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error(`Failed to send GDB answer to WhatsApp: ${res.statusText}`);
+    return res.json();
+  },
+
+  async simulateTwilioIncoming(payload: {
+    from_number: string;
+    body?: string;
+    button_payload?: string;
+    button_text?: string;
+  }): Promise<{
+    action: string;
+    from: string;
+    query?: string;
+    matched_gdb_id?: string;
+    crop?: string;
+    outgoing_reply?: string;
+    rating?: number;
+    status?: string;
+    button_payload?: string;
+    button_text?: string;
+    feedback_result?: any;
+    buttons?: any[];
+  }> {
+    const res = await fetch(`${BASE_URL}/whatsapp/twilio/simulate-incoming`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error(`Failed to simulate incoming Twilio message: ${res.statusText}`);
+    return res.json();
+  },
+
+  // Ongoing Farmer Inquiry Sessions & GDB Feedback Pipeline
+  async askFarmerQuestion(payload: {
+    phone_number: string;
+    question: string;
+    crop?: string;
+    farmer_state?: string;
+  }): Promise<{
+    status: string;
+    session: any;
+    gdb_id: string;
+    crop: string;
+    answer_hi: string;
+    answer_en: string;
+    question_hi?: string;
+    question_en?: string;
+  }> {
+    const res = await fetch(`${BASE_URL}/whatsapp/ask-question`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error(`Failed to submit question: ${res.statusText}`);
+    return res.json();
+  },
+
+  async submitFarmerFeedback(payload: {
+    phone_number?: string;
+    session_id?: string;
+    rating: number;
+    feedback_comment?: string;
+    root_cause?: string;
+  }): Promise<{ status: string; session: any }> {
+    const res = await fetch(`${BASE_URL}/whatsapp/submit-feedback`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error(`Failed to submit feedback: ${res.statusText}`);
+    return res.json();
+  },
+
+  async getOngoingSessions(limit: number = 50): Promise<any[]> {
+    const res = await fetch(`${BASE_URL}/whatsapp/ongoing-sessions?limit=${limit}`);
+    if (!res.ok) throw new Error(`Failed to load ongoing sessions: ${res.statusText}`);
+    return res.json();
+  },
+
+  async deleteOngoingSession(sessionId: string): Promise<any> {
+    const res = await fetch(`${BASE_URL}/whatsapp/ongoing-sessions/${sessionId}`, {
+      method: 'DELETE',
+    });
+    if (!res.ok) throw new Error(`Failed to delete session: ${res.statusText}`);
+    return res.json();
+  },
+
+  async pushFeedbackToGdb(sessionId: string): Promise<{
+    success: boolean;
+    session_id: string;
+    gdb_id: string;
+    rating: number;
+    pushed_via: string;
+    notified_farmer: boolean;
+    message: string;
+  }> {
+    const res = await fetch(`${BASE_URL}/whatsapp/feedback/push/${sessionId}`, {
+      method: 'POST',
+    });
+    if (!res.ok) throw new Error(`Failed to push feedback to GDB: ${res.statusText}`);
+    return res.json();
+  },
+
+  async pushAllFeedbackToGdb(): Promise<{
+    status: string;
+    total_pushed: number;
+    total_failed: number;
+    pushed_sessions: any[];
+    errors: any[];
+    executed_at: string;
+  }> {
+    const res = await fetch(`${BASE_URL}/whatsapp/feedback/push-all`, {
+      method: 'POST',
+    });
+    if (!res.ok) throw new Error(`Failed to push all feedback: ${res.statusText}`);
+    return res.json();
+  },
+
+  async triggerNudgeCronNow(): Promise<any> {
+    const res = await fetch(`${BASE_URL}/whatsapp/nudge/cron/run-now`, {
+      method: 'POST',
+    });
+    if (!res.ok) throw new Error(`Failed to run evening cron job: ${res.statusText}`);
+    return res.json();
+  },
+
+  async getNudgeCronStatus(): Promise<any> {
+    const res = await fetch(`${BASE_URL}/whatsapp/nudge/cron/status`);
+    if (!res.ok) throw new Error(`Failed to get cron status: ${res.statusText}`);
+    return res.json();
+  },
+
   // Weekly Digest
   async getWeeklyDigest(): Promise<WeeklyDigestItem> {
     const res = await fetch(`${BASE_URL}/digest/weekly`);
@@ -195,7 +424,7 @@ export const api = {
 
   // Health
   async checkHealth(): Promise<{ status: string; project: string; version: string }> {
-    const res = await fetch('/');
+    const res = await fetch(`${BASE_URL}/health`);
     if (!res.ok) throw new Error('Health check failed');
     return res.json();
   }

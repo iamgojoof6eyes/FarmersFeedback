@@ -24,29 +24,40 @@ def start_scheduler() -> BackgroundScheduler:
     """
     sched = get_scheduler()
     
-    # Configure daily cron trigger at 02:00 IST (Asia/Kolkata)
-    trigger = CronTrigger(hour=2, minute=0, timezone=IST_TIMEZONE)
+    # Configure daily cron trigger using configured hour and minute (Asia/Kolkata)
+    from backend.app.config import settings
+    cron_hour = getattr(settings, "CRON_FLAGGING_HOUR", 2)
+    cron_minute = getattr(settings, "CRON_FLAGGING_MINUTE", 0)
+    trigger = CronTrigger(hour=cron_hour, minute=cron_minute, timezone=IST_TIMEZONE)
     
-    # Add or update the job
+    # Add or update the 2:00 AM IST flagging scan job
     sched.add_job(
         func=scan_and_flag_all_candidates,
         trigger=trigger,
         id=JOB_ID,
-        name="Daily GDB Flagging Quality Scan (2:00 AM IST)",
+        name=f"Daily GDB Flagging Quality Scan ({cron_hour:02d}:{cron_minute:02d} IST)",
         replace_existing=True,
         misfire_grace_time=3600 # 1 hour grace if server was temporarily restarted
+    )
+
+    # Configure unresponded farmers feedback nudge cron trigger at 7:00 PM & 9:00 PM IST (Asia/Kolkata)
+    from helpers.session_pipeline import run_unresponded_farmer_nudge_cron
+    nudge_trigger = CronTrigger(hour="19,21", minute=0, timezone=IST_TIMEZONE)
+    sched.add_job(
+        func=run_unresponded_farmer_nudge_cron,
+        trigger=nudge_trigger,
+        id="unresponded_farmer_nudge_cron",
+        name="Unresponded Farmers Feedback Nudge (7:00 PM & 9:00 PM IST)",
+        replace_existing=True,
+        misfire_grace_time=3600
     )
     
     if not sched.running:
         sched.start()
         logger.info("APScheduler background scheduler started successfully.")
         
-    job = sched.get_job(JOB_ID)
-    if job:
-        logger.info(
-            f"Scheduled '{job.name}' [ID: {job.id}] to run everyday at 02:00 IST. "
-            f"Next scheduled run: {job.next_run_time}"
-        )
+    for j in sched.get_jobs():
+        logger.info(f"Scheduled '{j.name}' [ID: {j.id}] - Next run: {j.next_run_time}")
         
     return sched
 
@@ -88,3 +99,16 @@ def trigger_cron_now() -> Dict[str, Any]:
     """
     logger.info("Manual trigger requested for daily GDB flagging scan...")
     return scan_and_flag_all_candidates()
+
+def trigger_evening_nudge_cron_now() -> Dict[str, Any]:
+    """
+    Manually triggers the unresponded farmers feedback nudge cron job immediately.
+    """
+    logger.info("Manual trigger requested for unresponded farmers feedback nudge...")
+    from helpers.session_pipeline import run_unresponded_farmer_nudge_cron
+    return run_unresponded_farmer_nudge_cron()
+
+def trigger_unresponded_nudge_cron_now() -> Dict[str, Any]:
+    """Alias for trigger_evening_nudge_cron_now."""
+    return trigger_evening_nudge_cron_now()
+

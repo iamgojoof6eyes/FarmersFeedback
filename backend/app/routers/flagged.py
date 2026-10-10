@@ -21,11 +21,11 @@ class ThresholdConfigRequest(BaseModel):
 def get_queue(status: Optional[str] = None):
     db = get_db()
     if status and status != "ALL":
-        if status in ("RESOLVED", "RE_VALIDATED"):
+        if status in ("RESOLVED", "RE_VALIDATED", "RETIRED"):
             q = {
                 "$or": [
-                    {"status": {"$in": ["RE_VALIDATED", "RESOLVED"]}},
-                    {"flag_info.review_status": {"$in": ["RESOLVED", "RE_VALIDATED"]}},
+                    {"status": {"$in": ["RE_VALIDATED", "RESOLVED", "RETIRED"]}},
+                    {"flag_info.review_status": {"$in": ["RESOLVED", "RE_VALIDATED", "RETIRED"]}},
                     {"flag_info.is_resolved": True}
                 ]
             }
@@ -71,8 +71,8 @@ def get_queue(status: Optional[str] = None):
         ratio = metrics.get("helpful_ratio", round(upvotes / tot, 3) if tot > 0 else 1.0)
         
         is_resolved = (
-            doc.get("status") in ("RE_VALIDATED", "RESOLVED") or 
-            flag_info.get("review_status") in ("RE_VALIDATED", "RESOLVED") or 
+            doc.get("status") in ("RE_VALIDATED", "RESOLVED", "RETIRED") or 
+            flag_info.get("review_status") in ("RE_VALIDATED", "RESOLVED", "RETIRED") or 
             flag_info.get("is_resolved") is True
         )
         
@@ -122,9 +122,38 @@ def get_queue(status: Optional[str] = None):
         "queue": items
     }
 
+@router.post("/{gdb_id}/ai-answer")
+def generate_ai_answer(gdb_id: str):
+    """
+    Generates a suitable replacement answer (<100 words in Hindi and English)
+    using the NVIDIA Build NIM API based on the flagged question and crop context.
+    """
+    db = get_db()
+    gdb = db["gdb_entries"].find_one({"_id": gdb_id})
+    if not gdb:
+        return {"status": "error", "message": f"Entry {gdb_id} not found."}
+        
+    from helpers.nvidia_service import generate_suitable_answer_with_nvidia
+    flag_info = gdb.get("flag_info") or {}
+    causes = list(flag_info.get("root_cause_breakdown", {}).keys()) if isinstance(flag_info.get("root_cause_breakdown"), dict) else []
+    
+    result = generate_suitable_answer_with_nvidia(
+        crop=gdb.get("crop", ""),
+        domain=gdb.get("domain", ""),
+        question_hi=gdb.get("question_hi", ""),
+        question_en=gdb.get("question_en", ""),
+        current_answer_hi=gdb.get("answer_hi", ""),
+        current_answer_en=gdb.get("answer_en", ""),
+        root_causes=causes
+    )
+    return {
+        "status": "success",
+        "gdb_id": gdb_id,
+        **result
+    }
+
 @router.post("/{gdb_id}/resolve")
 def resolve(gdb_id: str, payload: ResolveRequest):
-    print(payload)
     return resolve_flagged_entry(
         gdb_id=gdb_id,
         revised_answer_hi=payload.revised_answer_hi,

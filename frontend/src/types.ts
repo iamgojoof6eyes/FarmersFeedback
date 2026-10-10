@@ -116,14 +116,18 @@ export interface GdbEntry {
 }
 
 export interface WhatsAppQuickButton {
+  id?: string;
   title: string;
-  payload: number;
+  payload?: number;
+  value?: number;
 }
 
 export interface RootCauseOption {
-  code: string;
-  label_hi: string;
-  label_en: string;
+  id?: string;
+  code?: string;
+  label?: string;
+  label_hi?: string;
+  label_en?: string;
 }
 
 export interface VoiceAnalysis {
@@ -135,12 +139,17 @@ export interface VoiceAnalysis {
 
 export interface WhatsAppSimulateResponse {
   step: 'ANSWER_DELIVERED' | 'FEEDBACK_RECORDED' | 'ROOT_CAUSE_RECORDED' | 'SCHEDULED_NUDGE_SENT' | 'ERROR' | string;
-  bot_response_text: string;
+  bot_response_text?: string;
+  outgoing_messages?: string[];
+  answer_text?: string;
+  prompt_text?: string;
   gdb_id?: string;
+  crop?: string;
   quick_reply_buttons?: WhatsAppQuickButton[];
   root_cause_options?: RootCauseOption[];
   voice_analysis?: VoiceAnalysis;
   scheduled_evening_nudge?: boolean;
+  is_new_question_on_open_session?: boolean;
 }
 
 export interface FarmerSession {

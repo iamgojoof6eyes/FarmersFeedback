@@ -1,11 +1,11 @@
 import { NavLink } from 'react-router-dom';
-import { 
-  BarChart3, 
-  AlertTriangle, 
-  MessageSquare, 
-  BookOpen, 
-  FileText, 
-  CloudRain, 
+import {
+  BarChart3,
+  AlertTriangle,
+  MessageSquare,
+  BookOpen,
+  FileText,
+  CloudRain,
   RotateCw
 } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
@@ -16,7 +16,7 @@ export function Header({ version = 'v2.0' }: { version?: string }) {
   const tabs = [
     { path: '/', label: 'Executive Analytics', icon: BarChart3, end: true },
     { path: '/flagged', label: 'Flagged Queue', icon: AlertTriangle, badge: unresolvedFlaggedCount > 0 ? unresolvedFlaggedCount : undefined },
-    { path: '/whatsapp', label: 'WhatsApp Simulator', icon: MessageSquare },
+    { path: '/whatsapp', label: 'Twilio WhatsApp', icon: MessageSquare },
     { path: '/gdb', label: 'GDB Knowledge Catalog', icon: BookOpen },
     { path: '/digest', label: 'Weekly Agri Digest', icon: FileText },
     { path: '/weather', label: 'IMD Weather Advisory', icon: CloudRain },
@@ -54,9 +54,9 @@ export function Header({ version = 'v2.0' }: { version?: string }) {
             </span>
           </div>
 
-          <button 
+          <button
             className="p-2 rounded-lg bg-white/5 border border-white/10 text-slate-400 hover:text-white hover:bg-white/10 transition-all cursor-pointer disabled:opacity-50"
-            onClick={refreshAll} 
+            onClick={refreshAll}
             title="Refresh All Data"
             disabled={isRefreshing}
           >
@@ -75,10 +75,9 @@ export function Header({ version = 'v2.0' }: { version?: string }) {
               to={tab.path}
               end={tab.end}
               className={({ isActive }) =>
-                `px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-medium flex items-center gap-2 whitespace-nowrap transition-all ${
-                  isActive
-                    ? 'text-emerald-400 bg-emerald-500/15 border border-emerald-500/30 font-semibold shadow-sm'
-                    : 'text-slate-400 hover:text-white hover:bg-white/5 border border-transparent'
+                `px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-medium flex items-center gap-2 whitespace-nowrap transition-all ${isActive
+                  ? 'text-emerald-400 bg-emerald-500/15 border border-emerald-500/30 font-semibold shadow-sm'
+                  : 'text-slate-400 hover:text-white hover:bg-white/5 border border-transparent'
                 }`
               }
             >

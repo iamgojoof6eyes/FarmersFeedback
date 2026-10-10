@@ -107,7 +107,8 @@ export const checkBackendHealth = createAsyncThunk<boolean>(
   async () => {
     try {
       const res = await api.checkHealth();
-      return Boolean(res && res.status === 'online');
+      const st = (res?.status || '').toLowerCase();
+      return st === 'online' || st === 'ok' || Boolean(res?.project);
     } catch {
       return false;
     }

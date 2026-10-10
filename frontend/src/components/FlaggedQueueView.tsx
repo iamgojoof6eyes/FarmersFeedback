@@ -11,7 +11,8 @@ import {
   ThumbsDown,
   Sparkles,
   Sliders,
-  Clock
+  Clock,
+  Bot
 } from 'lucide-react';
 
 interface FlaggedQueueViewProps {
@@ -51,6 +52,51 @@ export const FlaggedQueueView: React.FC<FlaggedQueueViewProps> = ({
   const [actionType, setActionType] = useState('REVISE_AND_REVALIDATE');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // AI Replacement state
+  const [isAiGenerating, setIsAiGenerating] = useState(false);
+  const [aiMeta, setAiMeta] = useState<{
+    model?: string;
+    source?: string;
+    word_count_hi?: number;
+    word_count_en?: number;
+  } | null>(null);
+
+  const countWords = (text: string): number => {
+    if (!text) return 0;
+    return text.trim().split(/\s+/).filter(Boolean).length;
+  };
+
+  const handleGenerateAiReplacement = async (targetEntry?: FlaggedEntry) => {
+    const target = targetEntry || selectedEntry;
+    if (!target) return;
+    try {
+      setIsAiGenerating(true);
+      const res = await api.generateAiAnswer(target.gdb_id);
+      if (res && res.answer_hi && res.answer_en) {
+        setRevisedHi(res.answer_hi);
+        setRevisedEn(res.answer_en);
+        setReviewerNote(res.reviewer_note || 'Auto-generated suitable replacement via NVIDIA Build NIM AI (<100 words in Hindi & English) prior to retirement.');
+        setAiMeta({
+          model: res.model,
+          source: res.source,
+          word_count_hi: res.word_count_hi,
+          word_count_en: res.word_count_en,
+        });
+      }
+    } catch (err: any) {
+      console.error('Failed to generate AI replacement:', err);
+    } finally {
+      setIsAiGenerating(false);
+    }
+  };
+
+  const handleActionChange = (newAction: string) => {
+    setActionType(newAction);
+    if (newAction === 'RETIRE' && selectedEntry) {
+      handleGenerateAiReplacement(selectedEntry);
+    }
+  };
+
   // Config modal state
   const [showConfigModal, setShowConfigModal] = useState(false);
   const [thresholdInput, setThresholdInput] = useState<number>(config?.helpful_threshold ?? 0.6);
@@ -63,10 +109,12 @@ export const FlaggedQueueView: React.FC<FlaggedQueueViewProps> = ({
     setRevisedEn(entry.revised_answer_en || entry.answer_en || '');
     setReviewerNote(entry.reviewer_note || '');
     setActionType('REVISE_AND_REVALIDATE');
+    setAiMeta(null);
   };
 
   const handleCloseResolve = () => {
     setSelectedEntry(null);
+    setAiMeta(null);
   };
 
   const handleSubmitResolution = async (e: React.SubmitEvent) => {
@@ -115,7 +163,7 @@ export const FlaggedQueueView: React.FC<FlaggedQueueViewProps> = ({
   const isItemResolved = (item: FlaggedEntry): boolean => {
     if (item.is_resolved === true || item.flag_info?.is_resolved === true || item.flag_info?.resolved === true) return true;
     const status = (item.status || item.flag_info?.review_status || item.review_status || '').toUpperCase();
-    return status === 'RE_VALIDATED' || status === 'RESOLVED';
+    return status === 'RE_VALIDATED' || status === 'RESOLVED' || status === 'RETIRED';
   };
 
   const isItemFlagged = (item: FlaggedEntry): boolean => {
@@ -491,11 +539,74 @@ export const FlaggedQueueView: React.FC<FlaggedQueueViewProps> = ({
                 </div>
               </div>
 
+              {/* Action selection upfront */}
+              <div className="mb-4">
+                <label className="block text-xs font-semibold text-slate-400 mb-1">
+                  Pipeline Action
+                </label>
+                <select
+                  className="w-full bg-slate-950 border border-white/15 rounded-xl p-2.5 text-xs sm:text-sm text-white focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+                  value={actionType}
+                  onChange={(e) => handleActionChange(e.target.value)}
+                >
+                  <option value="REVISE_AND_REVALIDATE">Revise Answer & Keep Active in GDB (Recommended)</option>
+                  <option value="RETIRE">Retire Answer & Auto-Generate AI Replacement (NVIDIA NIM)</option>
+                </select>
+              </div>
+
+              {/* NVIDIA AI Generation Banner when RETIRE is selected */}
+              {actionType === 'RETIRE' && (
+                <div className="bg-gradient-to-r from-emerald-950/60 via-slate-900/80 to-cyan-950/40 border border-emerald-500/30 rounded-xl p-3.5 mb-4 shadow-lg shadow-emerald-950/30">
+                  <div className="flex items-center justify-between gap-3 mb-1.5 flex-wrap">
+                    <div className="flex items-center gap-2">
+                      <div className="p-1.5 rounded-lg bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                        <Bot size={16} />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold text-white font-['Outfit']">
+                            NVIDIA Build NIM AI Integration
+                          </span>
+                          <span className="text-[10px] px-2 py-0.2 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-mono">
+                            {aiMeta?.model || 'meta/llama-3.1-70b-instruct'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleGenerateAiReplacement()}
+                      disabled={isAiGenerating}
+                      className="text-xs flex items-center gap-1.5 px-3 py-1 rounded-lg bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-200 border border-emerald-500/40 transition-all cursor-pointer disabled:opacity-50"
+                    >
+                      <RotateCw size={12} className={isAiGenerating ? 'animate-spin' : ''} />
+                      <span>{isAiGenerating ? 'Generating with AI...' : 'Regenerate with NVIDIA AI'}</span>
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-slate-300 leading-relaxed">
+                    {isAiGenerating
+                      ? 'Querying NVIDIA Build NIM API for an optimal, verified agronomic answer (<100 words in Hindi and English)...'
+                      : 'Retiring this entry triggers NVIDIA Build AI to generate a scientifically suitable answer (<100 words in Hindi & English) that will be preserved in the knowledge base.'}
+                  </p>
+                </div>
+              )}
+
               {/* Revised Hindi */}
               <div className="mb-3.5">
-                <label className="block text-xs font-semibold text-sky-400 mb-1">
-                  संशोधित उत्तर (Revised Answer in Hindi) *
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-semibold text-sky-400">
+                    संशोधित उत्तर (Revised Answer in Hindi) *
+                  </label>
+                  <span
+                    className={`text-[10px] px-2 py-0.5 rounded-full font-semibold border transition-all ${
+                      countWords(revisedHi) <= 100
+                        ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30'
+                        : 'text-amber-400 bg-amber-500/10 border-amber-500/30'
+                    }`}
+                  >
+                    {countWords(revisedHi)} / 100 words (Max 100)
+                  </span>
+                </div>
                 <textarea
                   className="w-full bg-slate-950 border border-white/15 rounded-xl p-3 text-xs sm:text-sm text-white focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 min-h-[75px]"
                   value={revisedHi}
@@ -507,9 +618,20 @@ export const FlaggedQueueView: React.FC<FlaggedQueueViewProps> = ({
 
               {/* Revised English */}
               <div className="mb-3.5">
-                <label className="block text-xs font-semibold text-sky-400 mb-1">
-                  Revised Answer in English *
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-semibold text-sky-400">
+                    Revised Answer in English *
+                  </label>
+                  <span
+                    className={`text-[10px] px-2 py-0.5 rounded-full font-semibold border transition-all ${
+                      countWords(revisedEn) <= 100
+                        ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30'
+                        : 'text-amber-400 bg-amber-500/10 border-amber-500/30'
+                    }`}
+                  >
+                    {countWords(revisedEn)} / 100 words (Max 100)
+                  </span>
+                </div>
                 <textarea
                   className="w-full bg-slate-950 border border-white/15 rounded-xl p-3 text-xs sm:text-sm text-white focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 min-h-[75px]"
                   value={revisedEn}
@@ -520,7 +642,7 @@ export const FlaggedQueueView: React.FC<FlaggedQueueViewProps> = ({
               </div>
 
               {/* Reviewer Note */}
-              <div className="mb-3.5">
+              <div className="mb-4">
                 <label className="block text-xs font-semibold text-slate-400 mb-1">
                   Reviewer Note & Justification
                 </label>
@@ -534,21 +656,6 @@ export const FlaggedQueueView: React.FC<FlaggedQueueViewProps> = ({
                 />
               </div>
 
-              {/* Action selection */}
-              <div className="mb-5">
-                <label className="block text-xs font-semibold text-slate-400 mb-1">
-                  Pipeline Action
-                </label>
-                <select
-                  className="w-full bg-slate-950 border border-white/15 rounded-xl p-2.5 text-xs sm:text-sm text-white focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
-                  value={actionType}
-                  onChange={(e) => setActionType(e.target.value)}
-                >
-                  <option value="REVISE_AND_REVALIDATE">Revise Answer & Keep Active in GDB (Recommended)</option>
-                  <option value="RETIRE">Retire Answer from Knowledge Base</option>
-                </select>
-              </div>
-
               {/* Modal Buttons */}
               <div className="flex justify-end gap-2.5">
                 <button
@@ -560,11 +667,23 @@ export const FlaggedQueueView: React.FC<FlaggedQueueViewProps> = ({
                 </button>
                 <button
                   type="submit"
-                  className="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs sm:text-sm px-4 py-2 rounded-lg transition-all flex items-center gap-1.5 shadow-lg shadow-emerald-600/30 cursor-pointer disabled:opacity-50"
-                  disabled={isSubmitting}
+                  className={`text-white font-semibold text-xs sm:text-sm px-4 py-2 rounded-lg transition-all flex items-center gap-1.5 shadow-lg cursor-pointer disabled:opacity-50 ${
+                    actionType === 'RETIRE'
+                      ? 'bg-rose-600 hover:bg-rose-500 shadow-rose-600/30'
+                      : 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-600/30'
+                  }`}
+                  disabled={isSubmitting || isAiGenerating}
                 >
                   <Save size={15} />
-                  <span>{isSubmitting ? 'Saving...' : 'Commit Resolution & Update GDB'}</span>
+                  <span>
+                    {isSubmitting
+                      ? actionType === 'RETIRE'
+                        ? 'Retiring & Saving AI Answer...'
+                        : 'Saving...'
+                      : actionType === 'RETIRE'
+                      ? 'Commit Retirement & Save AI Answer'
+                      : 'Commit Resolution & Update GDB'}
+                  </span>
                 </button>
               </div>
             </form>

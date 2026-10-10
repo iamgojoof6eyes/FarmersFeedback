@@ -23,8 +23,8 @@ interface ChatMessage {
   sender: 'user' | 'bot';
   text: string;
   timestamp: string;
-  buttons?: Array<{ title: string; payload: number }>;
-  rootCauses?: Array<{ code: string; label_hi: string; label_en: string }>;
+  buttons?: Array<{ id?: string; title: string; payload?: number; value?: number }>;
+  rootCauses?: Array<{ id?: string; code?: string; label?: string; label_hi?: string; label_en?: string }>;
   voiceAnalysis?: VoiceAnalysis;
   isVoice?: boolean;
 }
@@ -105,16 +105,48 @@ export const WhatsAppSimulator: React.FC = () => {
         input_type: 'TEXT'
       });
 
-      const botMsg: ChatMessage = {
-        id: String(Date.now() + 1),
-        sender: 'bot',
-        text: resp.bot_response_text,
-        timestamp: getCurrentTime(),
-        buttons: resp.quick_reply_buttons,
-        rootCauses: resp.root_cause_options
-      };
+      // If the farmer asked a new question while an old session was open,
+      // inject a system notice before the bot answer
+      if (resp.is_new_question_on_open_session) {
+        const noticeMsg: ChatMessage = {
+          id: String(Date.now() + 0.5),
+          sender: 'bot',
+          text: '📋 नया प्रश्न स्वीकार किया गया। पुराना सत्र अद्यतन किया जा रहा है — पुराने प्रश्न की प्रतिक्रिया रद्द नहीं हुई, केवल प्रश्न बदला।\n\n(New question received — ongoing session updated with new GDB context.)',
+          timestamp: getCurrentTime()
+        };
+        setMessages((prev) => [...prev, noticeMsg]);
+      }
 
-      setMessages((prev) => [...prev, botMsg]);
+      if (resp.outgoing_messages && resp.outgoing_messages.length >= 2) {
+        // 1. First show the verified agronomic response answer from GDB
+        const answerMsg: ChatMessage = {
+          id: String(Date.now() + 1),
+          sender: 'bot',
+          text: resp.outgoing_messages[0],
+          timestamp: getCurrentTime()
+        };
+
+        // 2. Then ask for 1-tap rating with feedback buttons
+        const ratingMsg: ChatMessage = {
+          id: String(Date.now() + 2),
+          sender: 'bot',
+          text: resp.outgoing_messages[1],
+          timestamp: getCurrentTime(),
+          buttons: resp.quick_reply_buttons
+        };
+
+        setMessages((prev) => [...prev, answerMsg, ratingMsg]);
+      } else {
+        const botMsg: ChatMessage = {
+          id: String(Date.now() + 1),
+          sender: 'bot',
+          text: resp.bot_response_text || (resp.outgoing_messages ? resp.outgoing_messages[0] : ''),
+          timestamp: getCurrentTime(),
+          buttons: resp.quick_reply_buttons,
+          rootCauses: resp.root_cause_options
+        };
+        setMessages((prev) => [...prev, botMsg]);
+      }
       await loadSession();
     } catch (err: any) {
       setMessages((prev) => [
@@ -156,7 +188,7 @@ export const WhatsAppSimulator: React.FC = () => {
       const botMsg: ChatMessage = {
         id: String(Date.now() + 1),
         sender: 'bot',
-        text: resp.bot_response_text,
+        text: resp.bot_response_text || (resp.outgoing_messages ? resp.outgoing_messages[0] : ''),
         timestamp: getCurrentTime(),
         rootCauses: resp.root_cause_options
       };
@@ -195,7 +227,7 @@ export const WhatsAppSimulator: React.FC = () => {
       const botMsg: ChatMessage = {
         id: String(Date.now() + 1),
         sender: 'bot',
-        text: resp.bot_response_text,
+        text: resp.bot_response_text || (resp.outgoing_messages ? resp.outgoing_messages[0] : ''),
         timestamp: getCurrentTime()
       };
 
@@ -235,7 +267,7 @@ export const WhatsAppSimulator: React.FC = () => {
       const botMsg: ChatMessage = {
         id: String(Date.now() + 1),
         sender: 'bot',
-        text: resp.bot_response_text,
+        text: resp.bot_response_text || (resp.outgoing_messages ? resp.outgoing_messages[0] : ''),
         timestamp: getCurrentTime(),
         voiceAnalysis: resp.voice_analysis
       };
@@ -262,10 +294,11 @@ export const WhatsAppSimulator: React.FC = () => {
         input_type: 'TRIGGER_NUDGE'
       });
 
+      const nudgeContent = resp.bot_response_text || (resp.outgoing_messages ? resp.outgoing_messages[0] : '');
       const botMsg: ChatMessage = {
         id: String(Date.now()),
         sender: 'bot',
-        text: `🌙 [7:30 PM Agro-Chrono Nudge]: ${resp.bot_response_text}`,
+        text: `🌙 [7:30 PM Agro-Chrono Nudge]: ${nudgeContent}`,
         timestamp: '7:30 PM',
         buttons: resp.quick_reply_buttons
       };
@@ -391,20 +424,23 @@ export const WhatsAppSimulator: React.FC = () => {
                 {/* 1-Tap Quick Reply Buttons */}
                 {msg.buttons && msg.buttons.length > 0 && (
                   <div className="flex gap-2 mt-1">
-                    {msg.buttons.map((btn) => (
-                      <button
-                        key={btn.payload}
-                        onClick={() => handleButtonClick(btn.payload, btn.title)}
-                        className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer border ${
-                          btn.payload === 1 
-                            ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40 hover:bg-emerald-500/30' 
-                            : 'bg-rose-500/20 text-rose-300 border-rose-500/40 hover:bg-rose-500/30'
-                        }`}
-                      >
-                        {btn.payload === 1 ? <ThumbsUp size={13} /> : <ThumbsDown size={13} />}
-                        <span>{btn.title}</span>
-                      </button>
-                    ))}
+                    {msg.buttons.map((btn) => {
+                      const btnVal = btn.value ?? btn.payload ?? 1;
+                      return (
+                        <button
+                          key={btn.id || btn.title}
+                          onClick={() => handleButtonClick(btnVal, btn.title)}
+                          className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer border ${
+                            btnVal === 1 
+                              ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40 hover:bg-emerald-500/30' 
+                              : 'bg-rose-500/20 text-rose-300 border-rose-500/40 hover:bg-rose-500/30'
+                          }`}
+                        >
+                          {btnVal === 1 ? <ThumbsUp size={13} /> : <ThumbsDown size={13} />}
+                          <span>{btn.title}</span>
+                        </button>
+                      );
+                    })}
                   </div>
                 )}
 
@@ -415,15 +451,19 @@ export const WhatsAppSimulator: React.FC = () => {
                       कृपया समस्या का कारण चुनें:
                     </span>
                     <div className="flex flex-wrap gap-1.5">
-                      {msg.rootCauses.map((rc) => (
-                        <button
-                          key={rc.code}
-                          onClick={() => handleSelectRootCause(rc.code, rc.label_hi)}
-                          className="bg-amber-500/15 text-amber-300 border border-amber-500/35 hover:bg-amber-500/25 px-2.5 py-1 rounded-md text-xs cursor-pointer text-left"
-                        >
-                          {rc.label_hi}
-                        </button>
-                      ))}
+                      {msg.rootCauses.map((rc) => {
+                        const code = rc.id || rc.code || '';
+                        const label = rc.label || rc.label_hi || rc.label_en || '';
+                        return (
+                          <button
+                            key={code}
+                            onClick={() => handleSelectRootCause(code, label)}
+                            className="bg-amber-500/15 text-amber-300 border border-amber-500/35 hover:bg-amber-500/25 px-2.5 py-1 rounded-md text-xs cursor-pointer text-left"
+                          >
+                            {label}
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
                 )}
